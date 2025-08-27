@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Air Quality Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+</head>
+<body>
+    <h2>ค้นหาสถานีในจังหวัด</h2>
+    <input type="text" id="provinceInput" placeholder="กรุงเทพมหานคร">
+    <button onclick="search()">ค้นหา</button>
+    <div id="map" style="height: 500px;"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+    let map = L.map('map').setView([13.75, 100.5], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    function search() {
+        let province = document.getElementById("provinceInput").value.trim();
+        if (!province) {
+            alert("กรุณากรอกชื่อจังหวัด");
+            return;
+        }
+
+        fetch(`http://localhost:3000/api/stations?province=${province}`)
+            .then(res => res.json())
+            .then(data => {
+                // ลบ marker เดิมออก
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) map.removeLayer(layer);
+                });
+
+                if (data.length === 0) {
+                    alert("ไม่พบสถานีในจังหวัดนี้");
+                    return;
+                }
+
+                let bounds = [];
+                data.forEach(station => {
+                    let marker = L.marker([station.lat, station.lon])
+                        .addTo(map)
+                        .bindPopup(`
+                            <strong>${station.station_name_th}</strong><br>
+                            AQI: ${station.aqi}<br>
+                            เวลา: ${station.record_datetime || ''}
+                        `);
+                    bounds.push([station.lat, station.lon]);
+                });
+
+                // ซูมให้เห็นทุก marker
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("เกิดข้อผิดพลาดในการดึงข้อมูล");
+            });
+    }
+    </script>
+</body>
+</html>

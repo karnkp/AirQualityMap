@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Air Quality Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      #map { height: 500px; }
+    </style>
+</head>
+<body>
+    <h2>เลือกจังหวัด</h2>
+    <select id="provinceSelect">
+      <option value="">-- เลือกจังหวัด --</option>
+    </select>
+    <button onclick="search()">ค้นหา</button>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      const map = L.map('map').setView([13.75, 100.5], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+      let markers = [];
+
+      // โหลดรายชื่อจังหวัดเติม dropdown
+      fetch('/api/provinces')
+        .then(res => res.json())
+        .then(provinces => {
+          const select = document.getElementById('provinceSelect');
+          provinces.forEach(province => {
+            const opt = document.createElement('option');
+            opt.value = province;
+            opt.textContent = province;
+            select.appendChild(opt);
+          });
+        });
+
+      function clearMarkers() {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+      }
+
+      function search() {
+        const province = document.getElementById('provinceSelect').value;
+        if (!province) {
+          alert('กรุณาเลือกจังหวัด');
+          return;
+        }
+
+        fetch(`/api/stations?province=${encodeURIComponent(province)}`)
+          .then(res => res.json())
+          .then(data => {
+            clearMarkers();
+
+            if (data.length === 0) {
+              alert('ไม่พบสถานีในจังหวัดนี้');
+              return;
+            }
+
+            const bounds = [];
+
+            data.forEach(station => {
+              const marker = L.marker([station.lat, station.lon])
+                .addTo(map)
+                .bindPopup(`<b>${station.station_name_th}</b><br>AQI: ${station.aqi}<br>เวลา: ${station.record_datetime || ''}`);
+              markers.push(marker);
+              bounds.push([station.lat, station.lon]);
+            });
+
+            map.fitBounds(bounds);
+          })
+          .catch(err => {
+            console.error(err);
+            alert('เกิดข้อผิดพลาดในการดึงข้อมูล');
+          });
+      }
+    </script>
+</body>
+</html>
